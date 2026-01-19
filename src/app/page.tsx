@@ -81,6 +81,7 @@ export default function BrainExplorer() {
 
   // 갤러리 페이지네이션
   const [galleryPage, setGalleryPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const postsPerPage = 12;
 
   // 초기 데이터 로드
@@ -113,11 +114,14 @@ export default function BrainExplorer() {
 
     switch (viewMode) {
       case 'gallery':
-        fetch('/api/posts?limit=5000')
+        // 경량 API로 전체 글 목록 로드 (content 제외, 빠름)
+        fetch('/api/posts-light')
           .then(r => r.json())
           .then(data => {
             setPosts(data.posts || []);
+            setStats(data.stats || { totalPosts: 0, years: 17 });
             setGalleryPage(1);
+            setHasMore(false); // 전체 로드됨
             setLoading(false);
           });
         break;
@@ -349,6 +353,7 @@ export default function BrainExplorer() {
                 </div>
               </div>
             )}
+
           </div>
         )}
 
