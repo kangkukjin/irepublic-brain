@@ -194,16 +194,26 @@ export async function searchPosts(searchQuery: string, limitCount: number = 30):
     .slice(0, limitCount);
 }
 
-// 월별 글 개수 (타임라인용)
+// 월별 글 개수 (타임라인용) - 캐시된 통계 사용
 export async function getMonthlyStats(): Promise<MonthStat[]> {
+  // 먼저 캐시된 통계 확인
+  const statsRef = doc(db, 'stats', 'monthly');
+  const statsSnap = await getDoc(statsRef);
+
+  if (statsSnap.exists()) {
+    const data = statsSnap.data();
+    return data.monthlyStats || [];
+  }
+
+  // 캐시가 없으면 계산 (느림 - 최초 1회만)
   const postsRef = collection(db, 'posts');
   const q = query(postsRef, orderBy('pub_date', 'asc'));
   const snapshot = await getDocs(q);
 
   const monthCounts: Record<string, number> = {};
 
-  snapshot.docs.forEach(doc => {
-    const post = doc.data() as Post;
+  snapshot.docs.forEach(docSnap => {
+    const post = docSnap.data() as Post;
     if (post.pub_date) {
       const yearMonth = post.pub_date.slice(0, 7); // "YYYY-MM"
       monthCounts[yearMonth] = (monthCounts[yearMonth] || 0) + 1;
@@ -229,15 +239,25 @@ export async function getPostsByDateRange(startDate: string, endDate: string): P
   return snapshot.docs.map(doc => doc.data() as Post);
 }
 
-// 카테고리 계층 구조 (지도용)
+// 카테고리 계층 구조 (지도용) - 캐시된 통계 사용
 export async function getCategoryHierarchy(): Promise<CategoryHierarchy[]> {
+  // 먼저 캐시된 통계 확인
+  const statsRef = doc(db, 'stats', 'categories');
+  const statsSnap = await getDoc(statsRef);
+
+  if (statsSnap.exists()) {
+    const data = statsSnap.data();
+    return data.hierarchy || [];
+  }
+
+  // 캐시가 없으면 계산 (느림 - 최초 1회만)
   const postsRef = collection(db, 'posts');
   const snapshot = await getDocs(postsRef);
 
   const hierarchy: Record<string, Record<string, number>> = {};
 
-  snapshot.docs.forEach(doc => {
-    const post = doc.data() as Post;
+  snapshot.docs.forEach(docSnap => {
+    const post = docSnap.data() as Post;
     if (!post.category) return;
 
     let main: string;

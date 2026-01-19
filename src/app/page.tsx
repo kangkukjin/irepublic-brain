@@ -79,7 +79,7 @@ export default function BrainExplorer() {
   const [timelineZoom, setTimelineZoom] = useState<'year' | 'month' | 'day'>('year');
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [timelineSummaries, setTimelineSummaries] = useState<TimelineSummaries>({});
 
@@ -334,7 +334,9 @@ export default function BrainExplorer() {
           <div className="flex flex-col items-center justify-center py-32 gap-6">
             <div className="w-6 h-6 border-2 border-neutral-200 border-t-neutral-500 rounded-full animate-spin" />
             <p className="text-neutral-400 text-sm animate-pulse">
-              17년간의 기억을 불러오는 중...
+              {viewMode === 'gallery' && '17년간의 기억을 불러오는 중...'}
+              {viewMode === 'timeline' && '시간의 흐름을 정리하는 중...'}
+              {viewMode === 'map' && '생각의 지도를 그리는 중...'}
             </p>
           </div>
         )}
