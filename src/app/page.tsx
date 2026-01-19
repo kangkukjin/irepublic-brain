@@ -511,35 +511,60 @@ export default function BrainExplorer() {
               </div>
             )}
 
-            {/* Level 1: 메인 카테고리 목록 */}
+            {/* Level 1: 메인 카테고리 2D 맵 */}
             {mapZoom === 'categories' && (
-              <div className="space-y-1">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.main}
-                    onClick={() => {
-                      setSelectedMapCategory(cat.main);
-                      const hasSubcategories = cat.subs && cat.subs.some(s => s.name !== null);
-                      if (hasSubcategories) {
-                        setMapZoom('subcategories');
-                      } else {
-                        setMapZoom('posts');
-                      }
-                    }}
-                    className="w-full flex items-baseline gap-6 py-4 hover:bg-neutral-50 -mx-4 px-4 rounded-lg transition-colors text-left group"
-                  >
-                    <span className="flex-1 text-neutral-600 group-hover:text-neutral-800 transition-colors">
-                      {cat.main}
-                    </span>
-                    <span className="text-sm text-neutral-300 tabular-nums">{cat.total}</span>
-                  </button>
-                ))}
+              <div className="relative w-full aspect-square max-w-2xl mx-auto">
+                {categories.map((cat, index) => {
+                  // 원형 배치 - 글 수에 따라 크기 결정
+                  const total = categories.length;
+                  const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
+                  const radius = 35; // 중심에서의 거리 (%)
+                  const x = 50 + radius * Math.cos(angle);
+                  const y = 50 + radius * Math.sin(angle);
+
+                  // 크기 계산 (글 수에 비례, 최소 60px ~ 최대 140px)
+                  const maxTotal = Math.max(...categories.map(c => c.total));
+                  const minSize = 60;
+                  const maxSize = 140;
+                  const size = minSize + (cat.total / maxTotal) * (maxSize - minSize);
+
+                  return (
+                    <button
+                      key={cat.main}
+                      onClick={() => {
+                        setSelectedMapCategory(cat.main);
+                        const hasSubcategories = cat.subs && cat.subs.some(s => s.name !== null);
+                        if (hasSubcategories) {
+                          setMapZoom('subcategories');
+                        } else {
+                          setMapZoom('posts');
+                        }
+                      }}
+                      className="absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-all duration-300 flex items-center justify-center text-center p-2 hover:scale-110 hover:z-10"
+                      style={{
+                        left: `${x}%`,
+                        top: `${y}%`,
+                        width: `${size}px`,
+                        height: `${size}px`,
+                      }}
+                    >
+                      <div>
+                        <div className="text-xs font-medium text-neutral-700 leading-tight">
+                          {cat.main}
+                        </div>
+                        <div className="text-[10px] text-neutral-400 mt-0.5">
+                          {cat.total}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
 
-            {/* Level 2: 서브카테고리 목록 */}
+            {/* Level 2: 서브카테고리 2D 맵 */}
             {mapZoom === 'subcategories' && selectedMapCategory && (
-              <div>
+              <div className="relative w-full aspect-square max-w-2xl mx-auto">
                 {(() => {
                   const categoryData = categories.find(c => c.main === selectedMapCategory);
                   const subs = categoryData?.subs || [];
@@ -547,31 +572,53 @@ export default function BrainExplorer() {
 
                   if (validSubs.length === 0) {
                     return (
-                      <div className="text-center py-12 text-neutral-400">
+                      <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
                         서브카테고리가 없습니다
                       </div>
                     );
                   }
 
-                  return (
-                    <div className="space-y-1">
-                      {validSubs.map((sub) => (
-                        <button
-                          key={sub.name}
-                          onClick={() => {
-                            setMapZoom('posts');
-                            setSelectedSubCategory(sub.name!);
-                          }}
-                          className="w-full flex items-baseline gap-6 py-4 hover:bg-neutral-50 -mx-4 px-4 rounded-lg transition-colors text-left group"
-                        >
-                          <span className="flex-1 text-neutral-600 group-hover:text-neutral-800 transition-colors">
+                  const maxCount = Math.max(...validSubs.map(s => s.count));
+
+                  return validSubs.map((sub, index) => {
+                    // 원형 배치
+                    const total = validSubs.length;
+                    const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
+                    const radius = total > 6 ? 35 : 30;
+                    const x = 50 + radius * Math.cos(angle);
+                    const y = 50 + radius * Math.sin(angle);
+
+                    // 크기 계산
+                    const minSize = 50;
+                    const maxSize = 120;
+                    const size = minSize + (sub.count / maxCount) * (maxSize - minSize);
+
+                    return (
+                      <button
+                        key={sub.name}
+                        onClick={() => {
+                          setMapZoom('posts');
+                          setSelectedSubCategory(sub.name!);
+                        }}
+                        className="absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-all duration-300 flex items-center justify-center text-center p-2 hover:scale-110 hover:z-10"
+                        style={{
+                          left: `${x}%`,
+                          top: `${y}%`,
+                          width: `${size}px`,
+                          height: `${size}px`,
+                        }}
+                      >
+                        <div>
+                          <div className="text-xs font-medium text-neutral-700 leading-tight">
                             {sub.name}
-                          </span>
-                          <span className="text-sm text-neutral-300 tabular-nums">{sub.count}</span>
-                        </button>
-                      ))}
-                    </div>
-                  );
+                          </div>
+                          <div className="text-[10px] text-neutral-400 mt-0.5">
+                            {sub.count}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  });
                 })()}
               </div>
             )}
