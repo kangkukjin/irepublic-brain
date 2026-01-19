@@ -3,6 +3,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 
+// 클라이언트 캐시 (페이지 이동 후 돌아와도 다시 로드 안함)
+const cache: {
+  posts: Post[] | null;
+  monthlyStats: MonthStat[] | null;
+  categories: CategoryMap[] | null;
+} = {
+  posts: null,
+  monthlyStats: null,
+  categories: null,
+};
+
 // 타입 정의
 interface Post {
   id: number;
@@ -36,20 +47,17 @@ interface TimelineSummary {
 
 type TimelineSummaries = Record<string, TimelineSummary>;
 
+// 2D 지도용 타입
+interface CategoryMapPoint {
+  name: string;
+  x: number;
+  y: number;
+  count: number;
+}
+
 type MapZoomLevel = 'categories' | 'subcategories' | 'posts';
 
 type ViewMode = 'gallery' | 'timeline' | 'map';
-
-// 클라이언트 캐시 (페이지 이동 후 돌아와도 다시 로드 안함)
-const cache: {
-  posts: Post[] | null;
-  monthlyStats: MonthStat[] | null;
-  categories: CategoryMap[] | null;
-} = {
-  posts: null,
-  monthlyStats: null,
-  categories: null,
-};
 
 export default function BrainExplorer() {
   // 상태
@@ -58,19 +66,18 @@ export default function BrainExplorer() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [monthlyStats, setMonthlyStats] = useState<MonthStat[]>([]);
   const [categories, setCategories] = useState<CategoryMap[]>([]);
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
+  const [timelineZoom, setTimelineZoom] = useState<'year' | 'month' | 'day'>('year');
+  const [selectedYear, setSelectedYear] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [timelineSummaries, setTimelineSummaries] = useState<TimelineSummaries>({});
 
-  // 타임라인 상태
-  const [timelineZoom, setTimelineZoom] = useState<'year' | 'month' | 'day'>('year');
-  const [selectedYear, setSelectedYear] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-
-  // 주제(맵) 상태
+  // 2D 지도 상태
+  const [categoryMapData, setCategoryMapData] = useState<CategoryMapPoint[]>([]);
   const [mapZoom, setMapZoom] = useState<MapZoomLevel>('categories');
   const [selectedMapCategory, setSelectedMapCategory] = useState<string | null>(null);
-  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
 
   // 갤러리 페이지네이션
   const [galleryPage, setGalleryPage] = useState(1);
@@ -83,6 +90,12 @@ export default function BrainExplorer() {
       .then(r => r.json())
       .then(data => setTimelineSummaries(data))
       .catch(() => console.log('타임라인 요약 데이터 없음'));
+
+    // 2D 지도 데이터 로드
+    fetch('/data/category-map.json')
+      .then(r => r.json())
+      .then(data => setCategoryMapData(data))
+      .catch(() => console.log('카테고리 지도 데이터 없음'));
   }, []);
 
   // 뷰 모드 변경 시 데이터 로드 (정적 JSON + 캐시 활용)
@@ -144,26 +157,21 @@ export default function BrainExplorer() {
     }
   }, [viewMode]);
 
-  // 주제: 카테고리 선택 시 해당 글 로드
+  // 서브카테고리 또는 메인 카테고리 선택 시 해당 글 로드
   useEffect(() => {
-    if (mapZoom !== 'posts' || !selectedMapCategory) return;
+    if (mapZoom === 'posts' && selectedMapCategory) {
+      const filterPosts = (allPosts: Post[]) => {
+        if (selectedSubCategory) {
+          const fullCategory = `${selectedMapCategory}/${selectedSubCategory}`;
+          return allPosts.filter(p => p.category === fullCategory);
+        } else {
+          return allPosts.filter(p =>
+            p.category === selectedMapCategory ||
+            p.category.startsWith(`${selectedMapCategory}/`)
+          );
+        }
+      };
 
-    const filterPosts = (allPosts: Post[]) => {
-      if (selectedSubCategory) {
-        const fullCategory = `${selectedMapCategory}/${selectedSubCategory}`;
-        console.log('Filtering by:', fullCategory);
-        const filtered = allPosts.filter(p => p.category === fullCategory);
-        console.log('Found:', filtered.length);
-        return filtered;
-      } else {
-        return allPosts.filter(p =>
-          p.category === selectedMapCategory ||
-          p.category.startsWith(`${selectedMapCategory}/`)
-        );
-      }
-    };
-
-    const loadAndFilter = () => {
       if (cache.posts) {
         setPosts(filterPosts(cache.posts));
       } else {
@@ -177,9 +185,7 @@ export default function BrainExplorer() {
             setLoading(false);
           });
       }
-    };
-
-    loadAndFilter();
+    }
   }, [selectedSubCategory, selectedMapCategory, mapZoom]);
 
   // 타임라인: 월 선택 시 해당 글 로드
@@ -472,7 +478,7 @@ export default function BrainExplorer() {
           </div>
         )}
 
-        {/* ========== 주제 뷰 ========== */}
+        {/* ========== 주제/지도 뷰 (3단계 드릴다운) ========== */}
         {viewMode === 'map' && !loading && (
           <div>
             {/* 브레드크럼 */}
@@ -511,60 +517,49 @@ export default function BrainExplorer() {
               </div>
             )}
 
-            {/* Level 1: 메인 카테고리 2D 맵 */}
+            {/* Level 1: 메인 카테고리 2D 지도 */}
             {mapZoom === 'categories' && (
-              <div className="relative w-full aspect-square max-w-2xl mx-auto">
-                {categories.map((cat, index) => {
-                  // 원형 배치 - 글 수에 따라 크기 결정
-                  const total = categories.length;
-                  const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
-                  const radius = 35; // 중심에서의 거리 (%)
-                  const x = 50 + radius * Math.cos(angle);
-                  const y = 50 + radius * Math.sin(angle);
-
-                  // 크기 계산 (글 수에 비례, 최소 60px ~ 최대 140px)
-                  const maxTotal = Math.max(...categories.map(c => c.total));
-                  const minSize = 60;
-                  const maxSize = 140;
-                  const size = minSize + (cat.total / maxTotal) * (maxSize - minSize);
+              <div className="relative bg-neutral-50 rounded-2xl overflow-hidden" style={{ height: '70vh', minHeight: '500px' }}>
+                {categoryMapData.map((cat) => {
+                  const size = Math.max(12, Math.min(24, 10 + Math.sqrt(cat.count) * 0.8));
+                  const categoryData = categories.find(c => c.main === cat.name);
+                  const hasSubcategories = categoryData?.subs && categoryData.subs.some(s => s.name !== null);
 
                   return (
                     <button
-                      key={cat.main}
+                      key={cat.name}
                       onClick={() => {
-                        setSelectedMapCategory(cat.main);
-                        const hasSubcategories = cat.subs && cat.subs.some(s => s.name !== null);
+                        setSelectedMapCategory(cat.name);
                         if (hasSubcategories) {
                           setMapZoom('subcategories');
                         } else {
                           setMapZoom('posts');
                         }
                       }}
-                      className="absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-all duration-300 flex items-center justify-center text-center p-2 hover:scale-110 hover:z-10"
+                      className="absolute transform -translate-x-1/2 -translate-y-1/2 hover:scale-110 transition-all duration-200 cursor-pointer group"
                       style={{
-                        left: `${x}%`,
-                        top: `${y}%`,
-                        width: `${size}px`,
-                        height: `${size}px`,
+                        left: `${Math.max(10, Math.min(90, cat.x))}%`,
+                        top: `${Math.max(10, Math.min(90, cat.y))}%`,
                       }}
                     >
-                      <div>
-                        <div className="text-xs font-medium text-neutral-700 leading-tight">
-                          {cat.main}
-                        </div>
-                        <div className="text-[10px] text-neutral-400 mt-0.5">
-                          {cat.total}
-                        </div>
-                      </div>
+                      <span
+                        className="text-neutral-400 group-hover:text-neutral-700 transition-colors whitespace-nowrap"
+                        style={{ fontSize: `${size}px` }}
+                      >
+                        {cat.name}
+                      </span>
+                      <span className="ml-1 text-neutral-300 group-hover:text-neutral-500 text-xs">
+                        {cat.count}
+                      </span>
                     </button>
                   );
                 })}
               </div>
             )}
 
-            {/* Level 2: 서브카테고리 2D 맵 */}
+            {/* Level 2: 서브카테고리 리스트 */}
             {mapZoom === 'subcategories' && selectedMapCategory && (
-              <div className="relative w-full aspect-square max-w-2xl mx-auto">
+              <div>
                 {(() => {
                   const categoryData = categories.find(c => c.main === selectedMapCategory);
                   const subs = categoryData?.subs || [];
@@ -572,53 +567,29 @@ export default function BrainExplorer() {
 
                   if (validSubs.length === 0) {
                     return (
-                      <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
+                      <div className="text-center py-12 text-neutral-400">
                         서브카테고리가 없습니다
                       </div>
                     );
                   }
 
-                  const maxCount = Math.max(...validSubs.map(s => s.count));
-
-                  return validSubs.map((sub, index) => {
-                    // 원형 배치
-                    const total = validSubs.length;
-                    const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
-                    const radius = total > 6 ? 35 : 30;
-                    const x = 50 + radius * Math.cos(angle);
-                    const y = 50 + radius * Math.sin(angle);
-
-                    // 크기 계산
-                    const minSize = 50;
-                    const maxSize = 120;
-                    const size = minSize + (sub.count / maxCount) * (maxSize - minSize);
-
-                    return (
-                      <button
-                        key={sub.name}
-                        onClick={() => {
-                          setMapZoom('posts');
-                          setSelectedSubCategory(sub.name!);
-                        }}
-                        className="absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-all duration-300 flex items-center justify-center text-center p-2 hover:scale-110 hover:z-10"
-                        style={{
-                          left: `${x}%`,
-                          top: `${y}%`,
-                          width: `${size}px`,
-                          height: `${size}px`,
-                        }}
-                      >
-                        <div>
-                          <div className="text-xs font-medium text-neutral-700 leading-tight">
-                            {sub.name}
-                          </div>
-                          <div className="text-[10px] text-neutral-400 mt-0.5">
-                            {sub.count}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  });
+                  return (
+                    <div className="columns-2 md:columns-3 lg:columns-4 gap-8">
+                      {validSubs.map((sub) => (
+                        <button
+                          key={sub.name}
+                          onClick={() => {
+                            setSelectedSubCategory(sub.name!);
+                            setMapZoom('posts');
+                          }}
+                          className="block w-full text-left py-2 hover:bg-neutral-50 -mx-2 px-2 rounded transition-colors break-inside-avoid"
+                        >
+                          <span className="text-neutral-600 hover:text-neutral-900">{sub.name}</span>
+                          <span className="ml-2 text-neutral-300 text-sm">{sub.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
                 })()}
               </div>
             )}
