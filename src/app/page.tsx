@@ -146,19 +146,24 @@ export default function BrainExplorer() {
 
   // 주제: 카테고리 선택 시 해당 글 로드
   useEffect(() => {
-    if (mapZoom === 'posts' && selectedMapCategory) {
-      const filterPosts = (allPosts: Post[]) => {
-        if (selectedSubCategory) {
-          const fullCategory = `${selectedMapCategory}/${selectedSubCategory}`;
-          return allPosts.filter(p => p.category === fullCategory);
-        } else {
-          return allPosts.filter(p =>
-            p.category === selectedMapCategory ||
-            p.category.startsWith(`${selectedMapCategory}/`)
-          );
-        }
-      };
+    if (mapZoom !== 'posts' || !selectedMapCategory) return;
 
+    const filterPosts = (allPosts: Post[]) => {
+      if (selectedSubCategory) {
+        const fullCategory = `${selectedMapCategory}/${selectedSubCategory}`;
+        console.log('Filtering by:', fullCategory);
+        const filtered = allPosts.filter(p => p.category === fullCategory);
+        console.log('Found:', filtered.length);
+        return filtered;
+      } else {
+        return allPosts.filter(p =>
+          p.category === selectedMapCategory ||
+          p.category.startsWith(`${selectedMapCategory}/`)
+        );
+      }
+    };
+
+    const loadAndFilter = () => {
       if (cache.posts) {
         setPosts(filterPosts(cache.posts));
       } else {
@@ -172,7 +177,9 @@ export default function BrainExplorer() {
             setLoading(false);
           });
       }
-    }
+    };
+
+    loadAndFilter();
   }, [selectedSubCategory, selectedMapCategory, mapZoom]);
 
   // 타임라인: 월 선택 시 해당 글 로드
@@ -552,8 +559,8 @@ export default function BrainExplorer() {
                         <button
                           key={sub.name}
                           onClick={() => {
-                            setSelectedSubCategory(sub.name!);
                             setMapZoom('posts');
+                            setSelectedSubCategory(sub.name!);
                           }}
                           className="w-full flex items-baseline gap-6 py-4 hover:bg-neutral-50 -mx-4 px-4 rounded-lg transition-colors text-left group"
                         >
