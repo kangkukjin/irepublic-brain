@@ -179,19 +179,39 @@ export default function BrainExplorer() {
     }
   }, [viewMode]);
 
-  // 서브카테고리 선택 시 해당 글 로드
+  // 서브카테고리 또는 메인 카테고리 선택 시 해당 글 로드 (캐시된 데이터에서 필터링)
   useEffect(() => {
-    if (selectedSubCategory && selectedMapCategory) {
-      setLoading(true);
-      const fullCategory = `${selectedMapCategory}/${selectedSubCategory}`;
-      fetch(`/api/map?category=${encodeURIComponent(fullCategory)}`)
-        .then(r => r.json())
-        .then(data => {
-          setPosts(data.posts || []);
-          setLoading(false);
-        });
+    if (mapZoom === 'posts' && selectedMapCategory) {
+      // 캐시에서 가져오거나, 없으면 로드
+      const filterPosts = (allPosts: Post[]) => {
+        if (selectedSubCategory) {
+          // 서브카테고리 선택됨: "메인/서브" 형태로 필터
+          const fullCategory = `${selectedMapCategory}/${selectedSubCategory}`;
+          return allPosts.filter(p => p.category === fullCategory);
+        } else {
+          // 서브카테고리 없음: 메인 카테고리로 시작하는 모든 글
+          return allPosts.filter(p =>
+            p.category === selectedMapCategory ||
+            p.category.startsWith(`${selectedMapCategory}/`)
+          );
+        }
+      };
+
+      if (cache.posts) {
+        setPosts(filterPosts(cache.posts));
+      } else {
+        setLoading(true);
+        fetch('/data/posts-light.json')
+          .then(r => r.json())
+          .then(data => {
+            const allPosts = data.posts || [];
+            cache.posts = allPosts;
+            setPosts(filterPosts(allPosts));
+            setLoading(false);
+          });
+      }
     }
-  }, [selectedSubCategory, selectedMapCategory]);
+  }, [selectedSubCategory, selectedMapCategory, mapZoom]);
 
   // 타임라인 줌 처리
   useEffect(() => {
