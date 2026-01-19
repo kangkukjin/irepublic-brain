@@ -331,8 +331,11 @@ export default function BrainExplorer() {
       <main className="max-w-6xl mx-auto px-6 md:px-8 py-12">
         {/* 로딩 */}
         {loading && (
-          <div className="flex items-center justify-center py-32">
-            <div className="w-5 h-5 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
+          <div className="flex flex-col items-center justify-center py-32 gap-6">
+            <div className="w-6 h-6 border-2 border-neutral-200 border-t-neutral-500 rounded-full animate-spin" />
+            <p className="text-neutral-400 text-sm animate-pulse">
+              17년간의 기억을 불러오는 중...
+            </p>
           </div>
         )}
 
