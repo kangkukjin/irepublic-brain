@@ -3,6 +3,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 
+// 클라이언트 캐시 (페이지 이동 후 돌아와도 다시 로드 안함)
+const cache: {
+  posts: Post[] | null;
+  monthlyStats: MonthStat[] | null;
+  categories: CategoryMap[] | null;
+} = {
+  posts: null,
+  monthlyStats: null,
+  categories: null,
+};
+
 // 타입 정의
 interface Post {
   id: number;
@@ -108,38 +119,61 @@ export default function BrainExplorer() {
       .catch(() => console.log('글 지도 데이터 없음'));
   }, []);
 
-  // 뷰 모드 변경 시 데이터 로드
+  // 뷰 모드 변경 시 데이터 로드 (캐시 활용)
   useEffect(() => {
-    setLoading(true);
-
     switch (viewMode) {
       case 'gallery':
-        // 경량 API로 전체 글 목록 로드 (content 제외, 빠름)
+        // 캐시에 있으면 바로 사용
+        if (cache.posts) {
+          setPosts(cache.posts);
+          setStats({ totalPosts: cache.posts.length, years: 17 });
+          setLoading(false);
+          return;
+        }
+        setLoading(true);
         fetch('/api/posts-light')
           .then(r => r.json())
           .then(data => {
-            setPosts(data.posts || []);
+            const loadedPosts = data.posts || [];
+            cache.posts = loadedPosts; // 캐시에 저장
+            setPosts(loadedPosts);
             setStats(data.stats || { totalPosts: 0, years: 17 });
             setGalleryPage(1);
-            setHasMore(false); // 전체 로드됨
+            setHasMore(false);
             setLoading(false);
           });
         break;
 
       case 'timeline':
+        if (cache.monthlyStats) {
+          setMonthlyStats(cache.monthlyStats);
+          setLoading(false);
+          return;
+        }
+        setLoading(true);
         fetch('/api/timeline')
           .then(r => r.json())
           .then(data => {
-            setMonthlyStats(data.monthlyStats || []);
+            const loadedStats = data.monthlyStats || [];
+            cache.monthlyStats = loadedStats;
+            setMonthlyStats(loadedStats);
             setLoading(false);
           });
         break;
 
       case 'map':
+        if (cache.categories) {
+          setCategories(cache.categories);
+          setLoading(false);
+          return;
+        }
+        setLoading(true);
         fetch('/api/map')
           .then(r => r.json())
           .then(data => {
-            setCategories(data.categories || []);
+            const loadedCategories = data.categories || [];
+            cache.categories = loadedCategories;
+            setCategories(loadedCategories);
             setLoading(false);
           });
         break;
