@@ -674,53 +674,37 @@ export default function BrainExplorer() {
               </div>
             )}
 
-            {/* Level 3: 글 2D 지도 */}
+            {/* Level 3: 글 목록 */}
             {mapZoom === 'posts' && selectedMapCategory && (
-              <div className="relative bg-neutral-50 rounded-2xl overflow-hidden" style={{ height: '70vh', minHeight: '500px' }}>
-                {/* 글 점들 */}
-                {(selectedSubCategory
-                  ? subCategoryPostsWithCoords
-                  : postsMapData[selectedMapCategory] || []
-                ).map((post) => (
-                  <Link
-                    key={post.id}
-                    href={`/post/${post.id}`}
-                    className="absolute w-2 h-2 rounded-full bg-neutral-300 hover:bg-neutral-600 hover:scale-[4] transition-all duration-200 cursor-pointer"
-                    style={{
-                      left: `${post.x}%`,
-                      top: `${post.y}%`,
-                      transform: 'translate(-50%, -50%)',
-                    }}
-                    onMouseEnter={() => setHoveredPost(post)}
-                    onMouseLeave={() => setHoveredPost(null)}
-                  />
-                ))}
-
-                {/* 호버된 글 정보 */}
-                {hoveredPost && (
-                  <div
-                    className="absolute z-20 bg-white rounded-lg shadow-lg p-4 max-w-sm pointer-events-none border border-neutral-100"
-                    style={{
-                      left: `${Math.min(70, Math.max(30, hoveredPost.x))}%`,
-                      top: `${Math.min(65, Math.max(35, hoveredPost.y))}%`,
-                      transform: 'translate(-50%, -120%)',
-                    }}
-                  >
-                    <div className="text-sm text-neutral-700 leading-relaxed">
-                      {hoveredPost.title}
-                    </div>
-                    <div className="mt-2 text-xs text-neutral-400">
-                      {hoveredPost.pub_date?.slice(0, 10)}
-                    </div>
+              <div>
+                {posts.length === 0 ? (
+                  <div className="text-center py-12 text-neutral-400">
+                    글이 없습니다
+                  </div>
+                ) : (
+                  <div className="space-y-0 divide-y divide-neutral-100">
+                    {posts.map(post => (
+                      <Link
+                        key={post.post_id}
+                        href={`/post/${post.post_id}`}
+                        className="group block py-4 hover:bg-neutral-50 -mx-4 px-4 rounded-lg transition-colors"
+                      >
+                        <div className="flex items-baseline gap-4">
+                          <span className="text-sm text-neutral-300 tabular-nums w-24 flex-shrink-0">
+                            {post.pub_date?.slice(0, 10)}
+                          </span>
+                          <span className="flex-1 text-neutral-700 group-hover:text-neutral-900">
+                            {post.title}
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
                   </div>
                 )}
 
-                {/* 카테고리 정보 */}
-                <div className="absolute bottom-4 left-4 text-xs text-neutral-400">
-                  {selectedSubCategory
-                    ? `${posts.length}개의 글`
-                    : `${postsMapData[selectedMapCategory]?.length || 0}개의 글`
-                  }
+                {/* 글 개수 */}
+                <div className="mt-8 text-center text-sm text-neutral-400">
+                  {posts.length}개의 글
                 </div>
               </div>
             )}
