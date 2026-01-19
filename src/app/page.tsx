@@ -95,12 +95,8 @@ export default function BrainExplorer() {
   const [hasMore, setHasMore] = useState(true);
   const postsPerPage = 12;
 
-  // 초기 데이터 로드
+  // 초기 데이터 로드 (통계는 갤러리 로드 시 가져옴)
   useEffect(() => {
-    fetch('/api/posts?limit=1')
-      .then(r => r.json())
-      .then(data => setStats(prev => ({ ...prev, totalPosts: data.stats?.totalPosts || 0 })));
-
     // 타임라인 요약 데이터 로드
     fetch('/data/timeline-summaries.json')
       .then(r => r.json())
@@ -119,7 +115,7 @@ export default function BrainExplorer() {
       .catch(() => console.log('글 지도 데이터 없음'));
   }, []);
 
-  // 뷰 모드 변경 시 데이터 로드 (캐시 활용)
+  // 뷰 모드 변경 시 데이터 로드 (정적 JSON + 캐시 활용)
   useEffect(() => {
     switch (viewMode) {
       case 'gallery':
@@ -131,11 +127,12 @@ export default function BrainExplorer() {
           return;
         }
         setLoading(true);
-        fetch('/api/posts-light')
+        // 정적 JSON 파일 사용 (Firebase 호출 없음, 매우 빠름)
+        fetch('/data/posts-light.json')
           .then(r => r.json())
           .then(data => {
             const loadedPosts = data.posts || [];
-            cache.posts = loadedPosts; // 캐시에 저장
+            cache.posts = loadedPosts;
             setPosts(loadedPosts);
             setStats(data.stats || { totalPosts: 0, years: 17 });
             setGalleryPage(1);
@@ -151,7 +148,8 @@ export default function BrainExplorer() {
           return;
         }
         setLoading(true);
-        fetch('/api/timeline')
+        // 정적 JSON 파일 사용
+        fetch('/data/monthly-stats.json')
           .then(r => r.json())
           .then(data => {
             const loadedStats = data.monthlyStats || [];
@@ -168,7 +166,8 @@ export default function BrainExplorer() {
           return;
         }
         setLoading(true);
-        fetch('/api/map')
+        // 정적 JSON 파일 사용
+        fetch('/data/categories.json')
           .then(r => r.json())
           .then(data => {
             const loadedCategories = data.categories || [];
